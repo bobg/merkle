@@ -9,29 +9,21 @@ var (
 
 // MerkleRoot produces the merkle root hash of a sequence of byte slices.
 func MerkleRoot(genHasher func() hash.Hash, items <-chan []byte) []byte {
-	var (
-		result []byte
-		hashes = make(chan []byte)
-		ready  = make(chan struct{})
-		hasher = genHasher()
-	)
+	hashes := make(chan []byte)
 
 	go func() {
-		result = HashHashes(genHasher, hashes)
-		close(ready)
+		hasher := genHasher()
+		for item := range items {
+			hasher.Reset()
+			hasher.Write(LeafPrefix)
+			hasher.Write(item)
+			h := hasher.Sum(nil)
+			hashes <- h
+		}
+		close(hashes)
 	}()
 
-	for item := range items {
-		hasher.Reset()
-		hasher.Write(LeafPrefix)
-		hasher.Write(item)
-		h := hasher.Sum(nil)
-		hashes <- h
-	}
-	close(hashes)
-
-	<-ready
-	return result
+	return HashHashes(genHasher, hashes)
 }
 
 // HashHashes produces the merkle root hash of a tree of hashes;
