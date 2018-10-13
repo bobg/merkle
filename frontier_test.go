@@ -10,34 +10,34 @@ import (
 func TestFrontier(t *testing.T) {
 	cases := []struct {
 		inp  []string
-		want Tier
+		want ftier
 	}{
 		{},
 		{
 			inp: []string{"a"},
-			want: Tier{
+			want: ftier{
 				'a': newTier(),
 			},
 		},
 		{
 			inp: []string{"a", "b"},
-			want: Tier{
+			want: ftier{
 				'a': newTier(),
 				'b': newTier(),
 			},
 		},
 		{
 			inp: []string{"a", "ab"},
-			want: Tier{
-				'a': &Tier{
+			want: ftier{
+				'a': ftier{
 					'b': newTier(),
 				},
 			},
 		},
 		{
 			inp: []string{"ab"},
-			want: Tier{
-				'a': &Tier{
+			want: ftier{
+				'a': ftier{
 					'b': newTier(),
 				},
 			},
@@ -54,8 +54,8 @@ func TestFrontier(t *testing.T) {
 				close(ch)
 			}()
 			f := GenFrontier(ch)
-			if !f.top.Equal(&c.want) {
-				t.Errorf("got:\n%s\nwant:\n%s", spew.Sdump(f.top), spew.Sdump(&c.want))
+			if !f.top.Equal(c.want) {
+				t.Errorf("got:\n%s\nwant:\n%s", spew.Sdump(f.top), spew.Sdump(c.want))
 			}
 		})
 	}
