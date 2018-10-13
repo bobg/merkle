@@ -1,6 +1,8 @@
 package merkle
 
-import "hash"
+import (
+	"hash"
+)
 
 var (
 	LeafPrefix     = []byte{0}
@@ -35,6 +37,7 @@ func HashHashes(genHasher func() hash.Hash, hashes <-chan []byte) []byte {
 	)
 
 	for h := range hashes {
+		h := h
 		for height := 0; ; height++ {
 			if height == len(roots) {
 				roots = append(roots, h)

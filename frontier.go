@@ -1,9 +1,6 @@
 package merkle
 
-import (
-	"hash"
-	"sort"
-)
+import "hash"
 
 type ftier map[byte]ftier
 
@@ -81,26 +78,19 @@ func merkleRootHelper(tier ftier, ch chan<- []byte, prefix []byte) {
 	if tier == nil {
 		return
 	}
-	ch <- prefix
-	var keys byteSlice
-	for k := range tier {
-		keys = append(keys, k)
+	for i := 0; i < 256; i++ {
+		if tier[byte(i)] == nil {
+			s := append([]byte{}, prefix...)
+			s = append(s, byte(i))
+			ch <- s
+		}
 	}
-	sort.Sort(keys)
-	ch <- keys
-	for _, k := range keys {
-		if subtier := tier[k]; subtier != nil {
-			merkleRootHelper(subtier, ch, append(prefix, k))
+	for i := 0; i < 256; i++ {
+		if subtier := tier[byte(i)]; subtier != nil {
+			merkleRootHelper(subtier, ch, append(prefix, byte(i)))
 		}
 	}
 }
-
-// implements sort.Interface
-type byteSlice []byte
-
-func (s byteSlice) Len() int           { return len(s) }
-func (s byteSlice) Less(i, j int) bool { return s[i] < s[j] }
-func (s byteSlice) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 
 func (t ftier) Equal(other ftier) bool {
 	if t == nil {
