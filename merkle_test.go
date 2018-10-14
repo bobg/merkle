@@ -23,14 +23,11 @@ func TestMerkleRoot(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		ch := make(chan []byte)
-		go func() {
-			for _, s := range c.input {
-				ch <- s
-			}
-			close(ch)
-		}()
-		got := MerkleRoot(sha3.New256, ch)
+		m := NewM(sha3.New256)
+		for _, inp := range c.input {
+			m.Add(inp)
+		}
+		got := m.Read()
 		gotHex := hex.EncodeToString(got)
 		if gotHex != c.wantHex {
 			t.Errorf("on input %v, got %s, want %s", c.input, gotHex, c.wantHex)

@@ -66,15 +66,12 @@ func (f *Frontier) exclude(str []byte) {
 // MerkleRoot produces the merkle root hash of the frontier.
 // This can be used to prove in zero knowledge that a string is not in a given set.
 func (f *Frontier) MerkleRoot(genHasher func() hash.Hash) []byte {
-	ch := make(chan []byte)
-	go func() {
-		merkleRootHelper(f.top, ch, nil)
-		close(ch)
-	}()
-	return MerkleRoot(genHasher, ch)
+	m := NewM(genHasher)
+	merkleRootHelper(f.top, m, nil)
+	return m.Read()
 }
 
-func merkleRootHelper(tier ftier, ch chan<- []byte, prefix []byte) {
+func merkleRootHelper(tier ftier, m *M, prefix []byte) {
 	if tier == nil {
 		return
 	}
@@ -82,12 +79,12 @@ func merkleRootHelper(tier ftier, ch chan<- []byte, prefix []byte) {
 		if tier[byte(i)] == nil {
 			s := append([]byte{}, prefix...)
 			s = append(s, byte(i))
-			ch <- s
+			m.Add(s)
 		}
 	}
 	for i := 0; i < 256; i++ {
 		if subtier := tier[byte(i)]; subtier != nil {
-			merkleRootHelper(subtier, ch, append(prefix, byte(i)))
+			merkleRootHelper(subtier, m, append(prefix, byte(i)))
 		}
 	}
 }
