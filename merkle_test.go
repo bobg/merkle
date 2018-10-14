@@ -23,11 +23,11 @@ func TestMerkleRoot(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		m := NewM(sha3.New256)
+		m := NewTree(sha3.New256)
 		for _, inp := range c.input {
 			m.Add(inp)
 		}
-		got := m.Read()
+		got := m.Root()
 		gotHex := hex.EncodeToString(got)
 		if gotHex != c.wantHex {
 			t.Errorf("on input %v, got %s, want %s", c.input, gotHex, c.wantHex)

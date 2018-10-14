@@ -2,140 +2,180 @@ package merkle
 
 import "hash"
 
-var (
-	leafPrefix     = []byte{0}
-	interiorPrefix = []byte{1}
-)
-
-type M struct {
-	ch     chan []byte
-	ready  chan struct{}
-	result *[]byte
+// Tree accepts a sequence of strings via its Add method.
+// It build a merkle hash tree from them.
+// After adding all strings in the sequence,
+// their merkle root hash may be read via the Root method.
+type Tree struct {
+	ch    chan []byte
+	ready chan struct{}
+	root  *[]byte
 }
 
-func NewM(genHasher func() hash.Hash) *M {
+// NewTree produces a new Tree.
+// It uses the hash function produced by genHasher to compute the hashes for the merkle tree nodes.
+func NewTree(genHasher func() hash.Hash) *Tree {
 	var (
-		ch     = make(chan []byte)
-		ready  = make(chan struct{})
-		hasher = genHasher()
-		h      = NewH(genHasher)
-		result []byte
+		ch    = make(chan []byte)
+		ready = make(chan struct{})
+		root  []byte
 	)
 
 	go func() {
 		defer close(ready)
 
+		var (
+			hasher = genHasher()
+			h      = NewHTree(genHasher)
+		)
+
 		for item := range ch {
-			hasher.Reset()
-			hasher.Write(leafPrefix)
-			hasher.Write(item)
-			h.Add(hasher.Sum(nil))
+			h.Add(LeafHash(hasher, item))
 		}
 
-		result = h.Read()
+		root = h.Root()
 	}()
 
-	return &M{
-		ch:     ch,
-		ready:  ready,
-		result: &result,
+	return &Tree{
+		ch:    ch,
+		ready: ready,
+		root:  &root,
 	}
 }
 
-func (m *M) Add(str []byte) {
+// Add adds a string to the sequence in m.
+// It is an error to call Add after a call to Root.
+func (m *Tree) Add(str []byte) {
 	m.ch <- str
 }
 
-func (m *M) Read() []byte {
+// Root returns the merkle root hash
+// for the sequence of strings that have been added to m with Add.
+// It is an error to call Add after a call to Root.
+func (m *Tree) Root() []byte {
 	close(m.ch)
 	<-m.ready
-	return *m.result
+	return *m.root
 }
 
-type H struct {
-	ch     chan []byte
-	ready  chan struct{}
-	result *[]byte
+// HTree accepts a sequence of leaf hashes via its Add method.
+// A leaf hash is the result of calling LeafHash on a string.
+// After adding all leaf hashes in the sequence,
+// their merkle root hash may be read via the Root method.
+//
+// Note that a Tree works by converting its input from a sequence of strings
+// to the corresponding sequence of leaf hashes and feeding those to an HTree.
+type HTree struct {
+	ch    chan []byte
+	ready chan struct{}
+	root  *[]byte
 }
 
-func NewH(genHasher func() hash.Hash) *H {
+// NewHTree produces a new HTree.
+// It uses the hash function produced by genHasher to compute the hashes for the merkle tree nodes.
+func NewHTree(genHasher func() hash.Hash) *HTree {
 	var (
-		ch     = make(chan []byte)
-		ready  = make(chan struct{})
-		hasher = genHasher()
-		roots  [][]byte
-		result []byte
+		ch    = make(chan []byte)
+		ready = make(chan struct{})
+		root  []byte
 	)
 
 	go func() {
 		defer close(ready)
 
+		var (
+			hasher = genHasher()
+			hashes [][]byte
+		)
+
 		for h := range ch {
 
-			// Find the lowest height in roots where this hash fits.
+			// Find the lowest height in hashes where this hash fits.
 			// For each level where it does not fit,
 			// compute a combined hash, empty that level,
 			// and continue searching one level higher with the new hash.
 			for height := 0; ; height++ {
-				if height == len(roots) {
+				if height == len(hashes) {
 					// All levels filled. Add a new level.
-					roots = append(roots, h)
+					hashes = append(hashes, h)
 					break
 				}
-				if roots[height] == nil {
+				if hashes[height] == nil {
 					// This level is vacant. Fill it.
-					roots[height] = h
+					hashes[height] = h
 					break
 				}
 
 				// This level is full. Compute a combined hash and keep searching.
-				hasher.Reset()
-				hasher.Write(interiorPrefix)
-				hasher.Write(roots[height])
-				hasher.Write(h)
-				h = hasher.Sum(nil)
+				h = interiorHash(hasher, hashes[height], h)
 
 				// Also vacate this level.
-				roots[height] = nil
+				hashes[height] = nil
 			}
 		}
 
-		if len(roots) == 0 {
+		if len(hashes) == 0 {
 			hasher.Reset()
-			result = hasher.Sum(nil)
+			root = hasher.Sum(nil)
 			return
 		}
 
-		// Combine hashes upward toward the highest level in roots.
-		for _, root := range roots {
+		// Combine hashes upward toward the highest level in hashes.
+		for _, h := range hashes {
+			if h == nil {
+				continue
+			}
 			if root == nil {
+				root = h
 				continue
 			}
-			if result == nil {
-				result = root
-				continue
-			}
-			hasher.Reset()
-			hasher.Write(interiorPrefix)
-			hasher.Write(root)
-			hasher.Write(result)
-			result = hasher.Sum(nil)
+			root = interiorHash(hasher, h, root)
 		}
 	}()
 
-	return &H{
-		ch:     ch,
-		ready:  ready,
-		result: &result,
+	return &HTree{
+		ch:    ch,
+		ready: ready,
+		root:  &root,
 	}
 }
 
-func (h *H) Add(item []byte) {
+// Add adds a leaf hash to the sequence in h.
+// It is an error to call Add after a call to Root.
+func (h *HTree) Add(item []byte) {
 	h.ch <- item
 }
 
-func (h *H) Read() []byte {
+// Root returns the merkle root hash
+// for the sequence of leaf hashes that have been added to h with Add.
+// It is an error to call Add after a call to Root.
+func (h *HTree) Root() []byte {
 	close(h.ch)
 	<-h.ready
-	return *h.result
+	return *h.root
+}
+
+// LeafHash produces the hash of a leaf of a Tree.
+func LeafHash(h hash.Hash, str []byte) []byte {
+	h.Reset()
+
+	// Domain separator to prevent second-preimage attacks.
+	// https://en.wikipedia.org/wiki/Merkle_tree#Second_preimage_attack
+	h.Write([]byte{0})
+
+	h.Write(str)
+	return h.Sum(nil)
+}
+
+// interiorHash produces the hash of an interior node.
+func interiorHash(h hash.Hash, left, right []byte) []byte {
+	h.Reset()
+
+	// Domain separator to prevent second-preimage attacks.
+	// https://en.wikipedia.org/wiki/Merkle_tree#Second_preimage_attack
+	h.Write([]byte{1})
+
+	h.Write(left)
+	h.Write(right)
+	return h.Sum(nil)
 }
