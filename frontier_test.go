@@ -46,14 +46,10 @@ func TestFrontier(t *testing.T) {
 
 	for i, c := range cases {
 		t.Run(fmt.Sprintf("case %d", i+1), func(t *testing.T) {
-			ch := make(chan []byte)
-			go func() {
-				for _, s := range c.inp {
-					ch <- []byte(s)
-				}
-				close(ch)
-			}()
-			f := GenFrontier(ch)
+			var f Frontier
+			for _, s := range c.inp {
+				f.Exclude([]byte(s))
+			}
 			if !f.top.Equal(c.want) {
 				t.Errorf("got:\n%s\nwant:\n%s", spew.Sdump(f.top), spew.Sdump(c.want))
 			}
