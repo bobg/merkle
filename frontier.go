@@ -25,22 +25,13 @@ func newTier() ftier {
 //   b, c, d, aa, ab, ac, ad
 // All strings starting with those prefixes are not in S.
 // If we next add "abc" to S,
-// we must remove "ab" from F and add
+// we must remove "ab" from F and add:
 //   aba, abb, abd, abca, abcb, abcc, abcd
 type Frontier struct {
 	top ftier
 }
 
-// GenFrontier produces the frontier representing all strings _not_ in the input.
-func GenFrontier(strs <-chan []byte) *Frontier {
-	f := new(Frontier)
-	for str := range strs {
-		f.exclude(str)
-	}
-	return f
-}
-
-func (f *Frontier) exclude(str []byte) {
+func (f *Frontier) Exclude(str []byte) {
 	if len(str) == 0 {
 		if f.top != nil {
 			// xxx error

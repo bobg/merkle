@@ -1,6 +1,9 @@
 package merkle
 
-import "hash"
+import (
+	"bytes"
+	"hash"
+)
 
 // Tree accepts a sequence of strings via its Add method.
 // It build a merkle hash tree from them.
@@ -11,6 +14,15 @@ type Tree struct {
 	ready chan struct{}
 	root  *[]byte
 }
+
+type (
+	ProofStep struct {
+		H    []byte
+		Left bool
+	}
+
+	Proof []ProofStep
+)
 
 // NewTree produces a new Tree.
 // It uses the hash function produced by genHasher to compute the hashes for the merkle tree nodes.
@@ -69,15 +81,21 @@ type HTree struct {
 	ch    chan []byte
 	ready chan struct{}
 	root  *[]byte
+	proof *Proof
 }
 
 // NewHTree produces a new HTree.
 // It uses the hash function produced by genHasher to compute the hashes for the merkle tree nodes.
 func NewHTree(genHasher func() hash.Hash) *HTree {
+	return newHTree(genHasher, nil)
+}
+
+func newHTree(genHasher func() hash.Hash, ref []byte) *HTree {
 	var (
 		ch    = make(chan []byte)
 		ready = make(chan struct{})
 		root  []byte
+		proof Proof
 	)
 
 	go func() {
@@ -107,7 +125,7 @@ func NewHTree(genHasher func() hash.Hash) *HTree {
 				}
 
 				// This level is full. Compute a combined hash and keep searching.
-				h = interiorHash(hasher, hashes[height], h)
+				h = interiorHash(hasher, hashes[height], h, &ref, &proof)
 
 				// Also vacate this level.
 				hashes[height] = nil
@@ -129,7 +147,7 @@ func NewHTree(genHasher func() hash.Hash) *HTree {
 				root = h
 				continue
 			}
-			root = interiorHash(hasher, h, root)
+			root = interiorHash(hasher, h, root, &ref, &proof)
 		}
 	}()
 
@@ -137,6 +155,7 @@ func NewHTree(genHasher func() hash.Hash) *HTree {
 		ch:    ch,
 		ready: ready,
 		root:  &root,
+		proof: &proof,
 	}
 }
 
@@ -168,7 +187,15 @@ func LeafHash(h hash.Hash, str []byte) []byte {
 }
 
 // interiorHash produces the hash of an interior node.
-func interiorHash(h hash.Hash, left, right []byte) []byte {
+func interiorHash(h hash.Hash, left, right []byte, ref *[]byte, proof *Proof) []byte {
+	if ref != nil {
+		if bytes.Equal(*ref, left) {
+			*proof = append(*proof, ProofStep{H: right, Left: false})
+		} else if bytes.Equal(*ref, right) {
+			*proof = append(*proof, ProofStep{H: left, Left: true})
+		}
+	}
+
 	h.Reset()
 
 	// Domain separator to prevent second-preimage attacks.
@@ -177,5 +204,20 @@ func interiorHash(h hash.Hash, left, right []byte) []byte {
 
 	h.Write(left)
 	h.Write(right)
-	return h.Sum(nil)
+	result := h.Sum(nil)
+	if ref != nil {
+		*ref = result
+	}
+	return result
+}
+
+func (p Proof) Hash(hasher hash.Hash, h []byte) []byte {
+	for _, step := range p {
+		if step.Left {
+			h = interiorHash(hasher, step.H, h, nil, nil)
+		} else {
+			h = interiorHash(hasher, h, step.H, nil, nil)
+		}
+	}
+	return h
 }
