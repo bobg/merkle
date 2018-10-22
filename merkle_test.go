@@ -28,7 +28,7 @@ func TestMerkleRoot(t *testing.T) {
 			m.Add(inp)
 		}
 		got := m.Root()
-		gotHex := hex.EncodeToString(got)
+		gotHex := hex.EncodeToString(got[:])
 		if gotHex != c.wantHex {
 			t.Errorf("on input %v, got %s, want %s", c.input, gotHex, c.wantHex)
 		}

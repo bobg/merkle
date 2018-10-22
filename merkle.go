@@ -1,9 +1,6 @@
 package merkle
 
-import (
-	"bytes"
-	"hash"
-)
+import "hash"
 
 // Tree accepts a sequence of strings via its Add method.
 // It build a merkle hash tree from them.
@@ -12,17 +9,19 @@ import (
 type Tree struct {
 	ch    chan []byte
 	ready chan struct{}
-	root  *[]byte
+	root  *[32]byte
 }
 
 type (
 	ProofStep struct {
-		H    []byte
+		H    [32]byte
 		Left bool
 	}
 
 	Proof []ProofStep
 )
+
+var zero32 [32]byte
 
 // NewTree produces a new Tree.
 // It uses the hash function produced by genHasher to compute the hashes for the merkle tree nodes.
@@ -30,7 +29,7 @@ func NewTree(genHasher func() hash.Hash) *Tree {
 	var (
 		ch    = make(chan []byte)
 		ready = make(chan struct{})
-		root  []byte
+		root  [32]byte
 	)
 
 	go func() {
@@ -64,7 +63,7 @@ func (m *Tree) Add(str []byte) {
 // Root returns the merkle root hash
 // for the sequence of strings that have been added to m with Add.
 // It is an error to call Add after a call to Root.
-func (m *Tree) Root() []byte {
+func (m *Tree) Root() [32]byte {
 	close(m.ch)
 	<-m.ready
 	return *m.root
@@ -78,9 +77,9 @@ func (m *Tree) Root() []byte {
 // Note that a Tree works by converting its input from a sequence of strings
 // to the corresponding sequence of leaf hashes and feeding those to an HTree.
 type HTree struct {
-	ch    chan []byte
+	ch    chan [32]byte
 	ready chan struct{}
-	root  *[]byte
+	root  *[32]byte
 	proof *Proof
 }
 
@@ -90,11 +89,11 @@ func NewHTree(genHasher func() hash.Hash) *HTree {
 	return newHTree(genHasher, nil)
 }
 
-func newHTree(genHasher func() hash.Hash, ref []byte) *HTree {
+func newHTree(genHasher func() hash.Hash, ref *[32]byte) *HTree {
 	var (
-		ch    = make(chan []byte)
+		ch    = make(chan [32]byte)
 		ready = make(chan struct{})
-		root  []byte
+		root  [32]byte
 		proof Proof
 	)
 
@@ -103,7 +102,7 @@ func newHTree(genHasher func() hash.Hash, ref []byte) *HTree {
 
 		var (
 			hasher = genHasher()
-			hashes [][]byte
+			hashes [][32]byte
 		)
 
 		for h := range ch {
@@ -118,36 +117,36 @@ func newHTree(genHasher func() hash.Hash, ref []byte) *HTree {
 					hashes = append(hashes, h)
 					break
 				}
-				if hashes[height] == nil {
+				if hashes[height] == zero32 {
 					// This level is vacant. Fill it.
 					hashes[height] = h
 					break
 				}
 
 				// This level is full. Compute a combined hash and keep searching.
-				h = interiorHash(hasher, hashes[height], h, &ref, &proof)
+				h = interiorHash(hasher, hashes[height], h, ref, &proof)
 
 				// Also vacate this level.
-				hashes[height] = nil
+				hashes[height] = zero32
 			}
 		}
 
 		if len(hashes) == 0 {
 			hasher.Reset()
-			root = hasher.Sum(nil)
+			hasher.Sum(root[:0])
 			return
 		}
 
 		// Combine hashes upward toward the highest level in hashes.
 		for _, h := range hashes {
-			if h == nil {
+			if h == zero32 {
 				continue
 			}
-			if root == nil {
+			if root == zero32 {
 				root = h
 				continue
 			}
-			root = interiorHash(hasher, h, root, &ref, &proof)
+			root = interiorHash(hasher, h, root, ref, &proof)
 		}
 	}()
 
@@ -161,21 +160,21 @@ func newHTree(genHasher func() hash.Hash, ref []byte) *HTree {
 
 // Add adds a leaf hash to the sequence in h.
 // It is an error to call Add after a call to Root.
-func (h *HTree) Add(item []byte) {
+func (h *HTree) Add(item [32]byte) {
 	h.ch <- item
 }
 
 // Root returns the merkle root hash
 // for the sequence of leaf hashes that have been added to h with Add.
 // It is an error to call Add after a call to Root.
-func (h *HTree) Root() []byte {
+func (h *HTree) Root() [32]byte {
 	close(h.ch)
 	<-h.ready
 	return *h.root
 }
 
 // LeafHash produces the hash of a leaf of a Tree.
-func LeafHash(h hash.Hash, str []byte) []byte {
+func LeafHash(h hash.Hash, str []byte) [32]byte {
 	h.Reset()
 
 	// Domain separator to prevent second-preimage attacks.
@@ -183,15 +182,18 @@ func LeafHash(h hash.Hash, str []byte) []byte {
 	h.Write([]byte{0})
 
 	h.Write(str)
-	return h.Sum(nil)
+
+	var result [32]byte
+	h.Sum(result[:0])
+	return result
 }
 
 // interiorHash produces the hash of an interior node.
-func interiorHash(h hash.Hash, left, right []byte, ref *[]byte, proof *Proof) []byte {
+func interiorHash(h hash.Hash, left, right [32]byte, ref *[32]byte, proof *Proof) [32]byte {
 	if ref != nil {
-		if bytes.Equal(*ref, left) {
+		if *ref == left {
 			*proof = append(*proof, ProofStep{H: right, Left: false})
-		} else if bytes.Equal(*ref, right) {
+		} else if *ref == right {
 			*proof = append(*proof, ProofStep{H: left, Left: true})
 		}
 	}
@@ -202,16 +204,18 @@ func interiorHash(h hash.Hash, left, right []byte, ref *[]byte, proof *Proof) []
 	// https://en.wikipedia.org/wiki/Merkle_tree#Second_preimage_attack
 	h.Write([]byte{1})
 
-	h.Write(left)
-	h.Write(right)
-	result := h.Sum(nil)
+	h.Write(left[:])
+	h.Write(right[:])
+
+	var result [32]byte
+	h.Sum(result[:0])
 	if ref != nil {
 		*ref = result
 	}
 	return result
 }
 
-func (p Proof) Hash(hasher hash.Hash, h []byte) []byte {
+func (p Proof) Hash(hasher hash.Hash, h [32]byte) [32]byte {
 	for _, step := range p {
 		if step.Left {
 			h = interiorHash(hasher, step.H, h, nil, nil)
