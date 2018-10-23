@@ -2,11 +2,10 @@ package merkle
 
 import "hash"
 
-type ftier map[byte]ftier
-
-func newTier() ftier {
-	m := make(map[byte]ftier)
-	return m
+type tier interface {
+	get(byte) tier
+	set(byte, tier)
+	empty() bool
 }
 
 // Frontier is a trie that contains the shortest bytewise prefixes of all strings _not_ in a set.
@@ -28,7 +27,7 @@ func newTier() ftier {
 // we must remove "ab" from F and add:
 //   aba, abb, abd, abca, abcb, abcc, abcd
 type Frontier struct {
-	top ftier
+	top tier
 }
 
 func (f *Frontier) Exclude(str []byte) {
@@ -39,14 +38,14 @@ func (f *Frontier) Exclude(str []byte) {
 		return
 	}
 	if f.top == nil {
-		f.top = newTier()
+		f.top = new(slicetier)
 	}
 	tier := f.top
 	for _, b := range str {
-		subtier := tier[b]
+		subtier := tier.get(b)
 		if subtier == nil {
-			subtier = newTier()
-			tier[b] = subtier
+			subtier = new(slicetier)
+			tier.set(b, subtier)
 		}
 		tier = subtier
 	}
@@ -63,35 +62,20 @@ func (f *Frontier) MerkleRoot(genHasher func() hash.Hash) [32]byte {
 	return m.Root()
 }
 
-func merkleRootHelper(tier ftier, m *Tree, prefix []byte) {
+func merkleRootHelper(tier tier, m *Tree, prefix []byte) {
 	if tier == nil {
 		return
 	}
 	for i := 0; i < 256; i++ {
-		if tier[byte(i)] == nil {
+		if tier.get(byte(i)) == nil {
 			s := append([]byte{}, prefix...)
 			s = append(s, byte(i))
 			m.Add(s)
 		}
 	}
 	for i := 0; i < 256; i++ {
-		if subtier := tier[byte(i)]; subtier != nil {
+		if subtier := tier.get(byte(i)); subtier != nil {
 			merkleRootHelper(subtier, m, append(prefix, byte(i)))
 		}
 	}
-}
-
-func (t ftier) Equal(other ftier) bool {
-	if t == nil {
-		return other == nil || len(other) == 0
-	}
-	if other == nil {
-		return len(t) == 0
-	}
-	for i := 0; i < 256; i++ {
-		if !t[byte(i)].Equal(other[byte(i)]) {
-			return false
-		}
-	}
-	return true
 }
