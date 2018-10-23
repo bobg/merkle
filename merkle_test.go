@@ -66,14 +66,14 @@ func TestText(t *testing.T) {
 
 	const treeWantHex = "8acc3ef309961457bde157842e2a9d7b403294c30172b497372c19acecc622e5"
 	treeRoot := tree.Root()
-	treeRootHex := hex.EncodeToString(treeRoot)
+	treeRootHex := hex.EncodeToString(treeRoot[:])
 	if treeRootHex != treeWantHex {
 		t.Errorf("merkle tree: got %s, want %s", treeRootHex, treeWantHex)
 	}
 
 	const frontierWantHex = "a2403ca567d0b94085296973d1953f9e341b27a666010c1f9fe967e5aac0140b"
 	frontierRoot := frontier.MerkleRoot(sha256.New)
-	frontierRootHex := hex.EncodeToString(frontierRoot)
+	frontierRootHex := hex.EncodeToString(frontierRoot[:])
 	if frontierRootHex != frontierWantHex {
 		t.Errorf("frontier: got %s, want %s", frontierRootHex, frontierWantHex)
 	}
