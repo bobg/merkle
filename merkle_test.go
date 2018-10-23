@@ -1,7 +1,10 @@
 package merkle
 
 import (
+	"crypto/sha256"
 	"encoding/hex"
+	"io"
+	"os"
 	"testing"
 
 	"golang.org/x/crypto/sha3"
@@ -32,5 +35,129 @@ func TestMerkleRoot(t *testing.T) {
 		if gotHex != c.wantHex {
 			t.Errorf("on input %v, got %s, want %s", c.input, gotHex, c.wantHex)
 		}
+	}
+}
+
+func TestText(t *testing.T) {
+	f, err := os.Open("testdata/udhr.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+
+	const chunksize = 256
+
+	tree := NewTree(sha256.New)
+	var frontier Frontier
+
+	for {
+		var buf [chunksize]byte
+		n, err := io.ReadFull(f, buf[:])
+		if err == io.EOF {
+			// "The error is EOF only if no bytes were read."
+			break
+		}
+		if err != nil && err != io.ErrUnexpectedEOF {
+			t.Fatal(err)
+		}
+		tree.Add(buf[:n])
+		frontier.Exclude(buf[:n])
+	}
+
+	const treeWantHex = "8acc3ef309961457bde157842e2a9d7b403294c30172b497372c19acecc622e5"
+	treeRoot := tree.Root()
+	treeRootHex := hex.EncodeToString(treeRoot)
+	if treeRootHex != treeWantHex {
+		t.Errorf("merkle tree: got %s, want %s", treeRootHex, treeWantHex)
+	}
+
+	const frontierWantHex = "a2403ca567d0b94085296973d1953f9e341b27a666010c1f9fe967e5aac0140b"
+	frontierRoot := frontier.MerkleRoot(sha256.New)
+	frontierRootHex := hex.EncodeToString(frontierRoot)
+	if frontierRootHex != frontierWantHex {
+		t.Errorf("frontier: got %s, want %s", frontierRootHex, frontierWantHex)
+	}
+}
+
+func BenchmarkTextMerkleTree(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		func() {
+			f, err := os.Open("testdata/udhr.txt")
+			if err != nil {
+				b.Fatal(err)
+			}
+			defer f.Close()
+
+			const chunksize = 256
+			tree := NewTree(sha256.New)
+			for {
+				var buf [chunksize]byte
+				n, err := io.ReadFull(f, buf[:])
+				if err == io.EOF {
+					// "The error is EOF only if no bytes were read."
+					break
+				}
+				if err != nil && err != io.ErrUnexpectedEOF {
+					b.Fatal(err)
+				}
+				tree.Add(buf[:n])
+			}
+			tree.Root()
+		}()
+	}
+}
+
+func BenchmarkTextFrontier(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		func() {
+			f, err := os.Open("testdata/udhr.txt")
+			if err != nil {
+				b.Fatal(err)
+			}
+			defer f.Close()
+
+			const chunksize = 256
+			var frontier Frontier
+			for {
+				var buf [chunksize]byte
+				n, err := io.ReadFull(f, buf[:])
+				if err == io.EOF {
+					// "The error is EOF only if no bytes were read."
+					break
+				}
+				if err != nil && err != io.ErrUnexpectedEOF {
+					b.Fatal(err)
+				}
+				frontier.Exclude(buf[:n])
+			}
+		}()
+	}
+}
+
+func BenchmarkTextFrontierMerkleRoot(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		func() {
+			f, err := os.Open("testdata/udhr.txt")
+			if err != nil {
+				b.Fatal(err)
+			}
+			defer f.Close()
+
+			const chunksize = 256
+			var frontier Frontier
+			for {
+				var buf [chunksize]byte
+				n, err := io.ReadFull(f, buf[:])
+				if err == io.EOF {
+					// "The error is EOF only if no bytes were read."
+					break
+				}
+				if err != nil && err != io.ErrUnexpectedEOF {
+					b.Fatal(err)
+				}
+				frontier.Exclude(buf[:n])
+			}
+			frontier.MerkleRoot(sha256.New)
+		}()
 	}
 }
