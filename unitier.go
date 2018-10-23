@@ -12,24 +12,24 @@ func (t *unitier) get(b byte) tier {
 	return nil
 }
 
-func (t *unitier) set(b []byte, subtier tier) tier {
+func (t *unitier) set(str []byte, subtier tier) tier {
 	if t == nil {
-		u := &unitier{b: b[0]}
-		return u.set(b, subtier)
+		u := &unitier{b: str[0]}
+		return u.set(str, subtier)
 	}
-	if t.b == b[0] {
-		if len(b) == 1 {
+	if t.b == str[0] {
+		if len(str) == 1 {
 			t.t = subtier
 			return t
 		}
 		if t.t == nil {
-			t.t = &unitier{b: b[1]}
+			t.t = &unitier{b: str[1]}
 		}
-		t.t = t.t.set(b[1:], subtier)
+		t.t = t.t.set(str[1:], subtier)
 		return t
 	}
 	s := &slicetier{slicetierpair{b: t.b, t: t.t}}
-	return s.set(b, subtier)
+	return s.set(str, subtier)
 }
 
 func (t *unitier) empty() bool { return false }

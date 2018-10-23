@@ -63,7 +63,6 @@ func TestText(t *testing.T) {
 		}
 		tree.Add(buf[:n])
 		leafhash := LeafHash(hasher, buf[:n])
-
 		frontier.Exclude(leafhash[:])
 	}
 
@@ -74,7 +73,7 @@ func TestText(t *testing.T) {
 		t.Errorf("merkle tree: got %s, want %s", treeRootHex, treeWantHex)
 	}
 
-	const frontierWantHex = "a2403ca567d0b94085296973d1953f9e341b27a666010c1f9fe967e5aac0140b"
+	const frontierWantHex = "1636797e538ff92e187c9028d648bdf0d13acc9196953960022de3382fb53cae"
 	frontierRoot := frontier.MerkleRoot(sha256.New)
 	frontierRootHex := hex.EncodeToString(frontierRoot[:])
 	if frontierRootHex != frontierWantHex {
@@ -118,9 +117,9 @@ func BenchmarkTextMerkleTree(b *testing.B) {
 //   - when tiers are [256]*tier
 //     BenchmarkTextFrontier takes 10,330,605 ns/op
 //     BenchmarkTextFrontierMerkleRoot takes 4,358,089,679 ns/op
-//   - when tiers are sorted slices of byte-subtier pairs
-//     BenchmarkTextFrontier takes 2,612,689 ns/op
-//     BenchmarkTextFrontierMerkleRoot takes 5,037,596,131 ns/op
+//   - when tiers are zerotiers, unitiers, and slicetiers
+//     BenchmarkTextFrontier takes 443,292 ns/op (!!)
+//     BenchmarkTextFrontierMerkleRoot takes 4,593,492,209 ns/op
 func BenchmarkTextFrontier(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		func() {

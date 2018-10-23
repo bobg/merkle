@@ -40,9 +40,9 @@ func (f *Frontier) Exclude(str []byte) {
 		return
 	}
 	if f.top == nil {
-		f.top = new(slicetier)
+		f.top = &unitier{b: str[0]}
 	}
-	f.top = f.top.set(str, new(slicetier))
+	f.top = f.top.set(str, zerotier{})
 }
 
 // MerkleRoot produces the merkle root hash of the frontier.
