@@ -3,7 +3,7 @@ package merkle
 import "hash"
 
 // Tree accepts a sequence of strings via its Add method.
-// It build a merkle hash tree from them.
+// It builds a merkle hash tree from them.
 // After adding all strings in the sequence,
 // their merkle root hash may be read via the Root method.
 type Tree struct {

@@ -1,10 +1,12 @@
 package merkle
 
-import "hash"
+import (
+	"hash"
+)
 
 type tier interface {
 	get(byte) tier
-	set(byte, tier)
+	set([]byte, tier) tier
 	empty() bool
 }
 
@@ -40,18 +42,7 @@ func (f *Frontier) Exclude(str []byte) {
 	if f.top == nil {
 		f.top = new(slicetier)
 	}
-	tier := f.top
-	for _, b := range str {
-		subtier := tier.get(b)
-		if subtier == nil {
-			subtier = new(slicetier)
-			tier.set(b, subtier)
-		}
-		tier = subtier
-	}
-	if tier != nil {
-		// xxx error?
-	}
+	f.top = f.top.set(str, new(slicetier))
 }
 
 // MerkleRoot produces the merkle root hash of the frontier.
