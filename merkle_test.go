@@ -48,6 +48,7 @@ func TestText(t *testing.T) {
 	const chunksize = 256
 
 	tree := NewTree(sha256.New)
+	hasher := sha256.New()
 	var frontier Frontier
 
 	for {
@@ -61,7 +62,8 @@ func TestText(t *testing.T) {
 			t.Fatal(err)
 		}
 		tree.Add(buf[:n])
-		frontier.Exclude(buf[:n])
+		leafhash := LeafHash(hasher, buf[:n])
+		frontier.Exclude(leafhash)
 	}
 
 	const treeWantHex = "8acc3ef309961457bde157842e2a9d7b403294c30172b497372c19acecc622e5"
@@ -71,7 +73,7 @@ func TestText(t *testing.T) {
 		t.Errorf("merkle tree: got %s, want %s", treeRootHex, treeWantHex)
 	}
 
-	const frontierWantHex = "a2403ca567d0b94085296973d1953f9e341b27a666010c1f9fe967e5aac0140b"
+	const frontierWantHex = "1636797e538ff92e187c9028d648bdf0d13acc9196953960022de3382fb53cae"
 	frontierRoot := frontier.MerkleRoot(sha256.New)
 	frontierRootHex := hex.EncodeToString(frontierRoot)
 	if frontierRootHex != frontierWantHex {
