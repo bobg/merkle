@@ -11,10 +11,19 @@ func (m maptier) get(b byte) tier {
 	return m[b]
 }
 
-func (m maptier) set(b byte, t tier) {
-	m[b] = t
+func (m maptier) set(str []byte, subtier tier) tier {
+	if len(str) == 1 {
+		m[str[0]] = subtier
+	} else {
+		el := m[str[0]]
+		if el == nil {
+			el = &unitier{b: str[1]}
+		}
+		m[str[0]] = el.set(str[1:], subtier)
+	}
+	return m
 }
 
-func (t maptier) empty() bool {
-	return t == nil || len(t) == 0
+func (m maptier) empty() bool {
+	return m == nil || len(m) == 0
 }

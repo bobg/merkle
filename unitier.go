@@ -28,8 +28,8 @@ func (t *unitier) set(str []byte, subtier tier) tier {
 		t.t = t.t.set(str[1:], subtier)
 		return t
 	}
-	s := &slicetier{slicetierpair{b: t.b, t: t.t}}
-	return s.set(str, subtier)
+	m := maptier{t.b: t.t}
+	return m.set(str, subtier)
 }
 
 func (t *unitier) empty() bool { return false }
