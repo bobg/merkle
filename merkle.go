@@ -3,6 +3,7 @@ package merkle
 import (
 	"bytes"
 	"hash"
+	"sync"
 )
 
 // Tree accepts a sequence of strings via its Add method.
@@ -10,8 +11,7 @@ import (
 // After adding all strings in the sequence,
 // their merkle root hash may be read via the Root method.
 type Tree struct {
-	hasher hash.Hash
-	htree  *HTree
+	htree *HTree
 }
 
 type (
@@ -24,25 +24,20 @@ type (
 )
 
 // NewTree produces a new Tree.
-// It uses the hash function produced by genHasher to compute the hashes for the merkle tree nodes.
-func NewTree(genHasher func() hash.Hash) *Tree {
-	var (
-		htree  = NewHTree(genHasher)
-		hasher = genHasher()
-	)
-
-	return &Tree{
-		hasher: hasher,
-		htree:  htree,
-	}
+func NewTree(hasher hash.Hash) *Tree {
+	return &Tree{htree: NewHTree(hasher)}
 }
 
 // Add adds a string to the sequence in m.
 // The caller may reuse the space in str.
 // It is an error to call Add after a call to Root.
 func (m *Tree) Add(str []byte) {
-	lh := make([]byte, m.hasher.Size())
-	m.htree.Add(LeafHash(m.hasher, lh[:0], str))
+	var lh []byte
+	m.htree.withHasher(func(hasher hash.Hash) {
+		lh = make([]byte, hasher.Size())
+		LeafHash(hasher, lh[:0], str)
+	})
+	m.htree.Add(lh)
 }
 
 // Root returns the merkle root hash
@@ -64,21 +59,29 @@ type HTree struct {
 	ready <-chan struct{}
 	root  *[]byte
 	proof *Proof
+
+	mu     sync.Mutex // protects hasher
+	hasher hash.Hash
 }
 
 // NewHTree produces a new HTree.
-// It uses the hash function produced by genHasher to compute the hashes for the merkle tree nodes.
-func NewHTree(genHasher func() hash.Hash) *HTree {
-	return newHTree(genHasher, nil)
+func NewHTree(hasher hash.Hash) *HTree {
+	return newHTree(hasher, nil)
 }
 
-func newHTree(genHasher func() hash.Hash, ref []byte) *HTree {
+func newHTree(hasher hash.Hash, ref []byte) *HTree {
 	var (
-		hasher = genHasher()
-		ch     = make(chan []byte)
-		ready  = make(chan struct{})
-		root   []byte
-		proof  Proof
+		ch    = make(chan []byte)
+		ready = make(chan struct{})
+		root  []byte
+		proof Proof
+		htree = &HTree{
+			ch:     ch,
+			ready:  ready,
+			root:   &root,
+			proof:  &proof,
+			hasher: hasher,
+		}
 	)
 
 	go func() {
@@ -105,7 +108,9 @@ func newHTree(genHasher func() hash.Hash, ref []byte) *HTree {
 				}
 
 				// This level is full. Compute a combined hash and keep searching.
-				interiorHash(hasher, h[:0], hashes[height], h, &ref, &proof)
+				htree.withHasher(func(hasher hash.Hash) {
+					interiorHash(hasher, h[:0], hashes[height], h, &ref, &proof)
+				})
 
 				// Also vacate this level.
 				hashes[height] = nil
@@ -113,8 +118,10 @@ func newHTree(genHasher func() hash.Hash, ref []byte) *HTree {
 		}
 
 		if len(hashes) == 0 {
-			hasher.Reset()
-			root = hasher.Sum(nil)
+			htree.withHasher(func(hasher hash.Hash) {
+				hasher.Reset()
+				root = hasher.Sum(nil)
+			})
 			return
 		}
 
@@ -127,16 +134,13 @@ func newHTree(genHasher func() hash.Hash, ref []byte) *HTree {
 				root = h
 				continue
 			}
-			interiorHash(hasher, root[:0], h, root, &ref, &proof)
+			htree.withHasher(func(hasher hash.Hash) {
+				interiorHash(hasher, root[:0], h, root, &ref, &proof)
+			})
 		}
 	}()
 
-	return &HTree{
-		ch:    ch,
-		ready: ready,
-		root:  &root,
-		proof: &proof,
-	}
+	return htree
 }
 
 // Add adds a leaf hash to the sequence in h.
@@ -144,6 +148,12 @@ func newHTree(genHasher func() hash.Hash, ref []byte) *HTree {
 // It is an error to call Add after a call to Root.
 func (h *HTree) Add(item []byte) {
 	h.ch <- item
+}
+
+func (h *HTree) withHasher(f func(hasher hash.Hash)) {
+	h.mu.Lock()
+	f(h.hasher)
+	h.mu.Unlock()
 }
 
 // Root returns the merkle root hash

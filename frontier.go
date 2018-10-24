@@ -47,8 +47,8 @@ func (f *Frontier) Exclude(str []byte) {
 
 // MerkleRoot produces the merkle root hash of the frontier.
 // This can be used to prove in zero knowledge that a string is not in a given set.
-func (f *Frontier) MerkleRoot(genHasher func() hash.Hash) []byte {
-	m := NewTree(genHasher)
+func (f *Frontier) MerkleRoot(hasher hash.Hash) []byte {
+	m := NewTree(hasher)
 	merkleRootHelper(f.top, m, nil)
 	return m.Root()
 }
