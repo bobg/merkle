@@ -62,7 +62,8 @@ func TestText(t *testing.T) {
 			t.Fatal(err)
 		}
 		tree.Add(buf[:n])
-		leafhash := LeafHash(hasher, buf[:n])
+		var leafhash [32]byte
+		LeafHash(hasher, leafhash[:0], buf[:n])
 		frontier.Exclude(leafhash[:])
 	}
 
