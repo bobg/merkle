@@ -28,8 +28,9 @@ func (t *unitier) set(str []byte, subtier tier) tier {
 		t.t = t.t.set(str[1:], subtier)
 		return t
 	}
-	m := maptier{t.b: t.t}
-	return m.set(str, subtier)
+	a := new(arraytier)
+	(*a)[t.b] = t.t
+	return a.set(str, subtier)
 }
 
 func (t *unitier) empty() bool { return false }
