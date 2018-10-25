@@ -1,51 +1,38 @@
 package merkle
 
-// func TestFrontier(t *testing.T) {
-// 	cases := []struct {
-// 		inp  []string
-// 		want maptier
-// 	}{
-// 		// xxx {},
-// 		{
-// 			inp: []string{"a"},
-// 			want: maptier{
-// 				'a': newMaptier(),
-// 			},
-// 		},
-// 		{
-// 			inp: []string{"a", "b"},
-// 			want: maptier{
-// 				'a': newMaptier(),
-// 				'b': newMaptier(),
-// 			},
-// 		},
-// 		{
-// 			inp: []string{"a", "ab"},
-// 			want: maptier{
-// 				'a': maptier{
-// 					'b': newMaptier(),
-// 				},
-// 			},
-// 		},
-// 		{
-// 			inp: []string{"ab"},
-// 			want: maptier{
-// 				'a': maptier{
-// 					'b': newMaptier(),
-// 				},
-// 			},
-// 		},
-// 	}
+import (
+	"fmt"
+	"testing"
+)
 
-// 	for i, c := range cases {
-// 		t.Run(fmt.Sprintf("case %d", i+1), func(t *testing.T) {
-// 			var f Frontier
-// 			for _, s := range c.inp {
-// 				f.Exclude([]byte(s))
-// 			}
-// 			if !f.top.equal(c.want) {
-// 				t.Errorf("got:\n%s\nwant:\n%s", spew.Sdump(f.top), spew.Sdump(c.want))
-// 			}
-// 		})
-// 	}
-// }
+func TestIsExcluded(t *testing.T) {
+	cases := []struct {
+		add  []string
+		test string
+		want bool
+	}{
+		{nil, "abc", true},
+		{[]string{"ab"}, "ab", true},
+		{nil, "abc", true},
+		{nil, "a", false},
+		{nil, "ac", false},
+		{nil, "b", false},
+		{[]string{"ba"}, "b", false},
+		{nil, "ba", true},
+		{nil, "bac", true},
+	}
+
+	var f Frontier
+
+	for i, c := range cases {
+		t.Run(fmt.Sprintf("case %d", i+1), func(t *testing.T) {
+			for _, a := range c.add {
+				f.Exclude([]byte(a))
+			}
+			got := f.IsExcluded([]byte(c.test))
+			if got != c.want {
+				t.Errorf("got %v, want %v", got, c.want)
+			}
+		})
+	}
+}
