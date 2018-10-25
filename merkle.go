@@ -30,9 +30,15 @@ func NewTree(hasher hash.Hash) *Tree {
 	return &Tree{htree: NewHTree(hasher)}
 }
 
+// NewProofTree produces a new Tree that can compactly prove a given string is in it.
+// After adding elements to the tree, call Proof to get the proof.
+func NewProofTree(hasher hash.Hash, ref []byte) *Tree {
+	return &Tree{htree: NewProofHTree(hasher, LeafHash(hasher, nil, ref))}
+}
+
 // Add adds a string to the sequence in m.
 // The caller may reuse the space in str.
-// It is an error to call Add after a call to Root.
+// It is an error to call Add after a call to Root or Proof.
 func (m *Tree) Add(str []byte) {
 	var lh []byte
 	m.htree.withHasher(func(hasher hash.Hash) {
@@ -49,6 +55,12 @@ func (m *Tree) Add(str []byte) {
 // It is an error to call Add after a call to Root.
 func (m *Tree) Root() []byte {
 	return m.htree.Root()
+}
+
+// Proof returns the merkle proof for the reference string given to NewProofTree.
+// It is an error to call Add after a call to Proof.
+func (m *Tree) Proof() Proof {
+	return m.htree.Proof()
 }
 
 // HTree accepts a sequence of leaf hashes via its Add method.
@@ -71,6 +83,12 @@ type HTree struct {
 // NewHTree produces a new HTree.
 func NewHTree(hasher hash.Hash) *HTree {
 	return newHTree(hasher, nil)
+}
+
+// NewProofHTree produces a new HTree that can compactly prove a given reference hash is in it.
+// After adding elements to the tree, call Proof to get the proof.
+func NewProofHTree(hasher hash.Hash, ref []byte) *HTree {
+	return newHTree(hasher, ref)
 }
 
 func newHTree(hasher hash.Hash, ref []byte) *HTree {
@@ -149,7 +167,7 @@ func newHTree(hasher hash.Hash, ref []byte) *HTree {
 
 // Add adds a leaf hash to the sequence in h.
 // The caller must not reuse the space in item.
-// It is an error to call Add after a call to Root.
+// It is an error to call Add after a call to Root or Proof.
 func (h *HTree) Add(item []byte) {
 	h.ch <- item
 }
@@ -164,9 +182,23 @@ func (h *HTree) withHasher(f func(hasher hash.Hash)) {
 // for the sequence of leaf hashes that have been added to h with Add.
 // It is an error to call Add after a call to Root.
 func (h *HTree) Root() []byte {
-	close(h.ch)
+	if h.ch != nil {
+		close(h.ch)
+		h.ch = nil
+	}
 	<-h.ready
 	return *h.root
+}
+
+// Proof returns the merkle proof for the reference hash given to NewProofHTree.
+// It is an error to call Add after a call to Proof.
+func (h *HTree) Proof() Proof {
+	if h.ch != nil {
+		close(h.ch)
+		h.ch = nil
+	}
+	<-h.ready
+	return *h.proof
 }
 
 // LeafHash produces the hash of a leaf of a Tree.
@@ -184,11 +216,24 @@ func LeafHash(h hash.Hash, out, in []byte) []byte {
 
 // interiorHash produces the hash of an interior node.
 func interiorHash(h hash.Hash, out, left, right []byte, ref *[]byte, proof *Proof) {
+	lcopy := make([]byte, len(left))
+	copy(lcopy, left)
+	rcopy := make([]byte, len(right))
+	copy(rcopy, right)
+
+	var step *ProofStep
 	if ref != nil {
 		if bytes.Equal(*ref, left) {
-			*proof = append(*proof, ProofStep{H: right, Left: false})
+			dup := make([]byte, len(right))
+			copy(dup, right)
+			step = &ProofStep{H: dup, Left: false}
 		} else if bytes.Equal(*ref, right) {
-			*proof = append(*proof, ProofStep{H: left, Left: true})
+			dup := make([]byte, len(left))
+			copy(dup, left)
+			step = &ProofStep{H: dup, Left: true}
+		}
+		if step != nil {
+			*proof = append(*proof, *step)
 		}
 	}
 
@@ -201,21 +246,25 @@ func interiorHash(h hash.Hash, out, left, right []byte, ref *[]byte, proof *Proo
 	h.Write(left)
 	h.Write(right)
 
-	h.Sum(out)
-	if ref != nil {
+	out = h.Sum(out)
+
+	if step != nil {
 		*ref = out
 	}
 }
 
 // Hash computes the hash of a merkle proof.
 // A valid merkle proof hash matches the root hash of the merkle tree it came from.
-func (p Proof) Hash(hasher hash.Hash, h []byte) []byte {
+func (p Proof) Hash(hasher hash.Hash, ref []byte) []byte {
+	result := make([]byte, hasher.Size())
+	copy(result, ref)
 	for _, step := range p {
 		if step.Left {
-			interiorHash(hasher, h[:0], step.H, h, nil, nil)
+			interiorHash(hasher, result[:0], step.H, result, nil, nil)
 		} else {
-			interiorHash(hasher, h[:0], h, step.H, nil, nil)
+			interiorHash(hasher, result[:0], result, step.H, nil, nil)
 		}
 	}
-	return h
+
+	return result
 }
