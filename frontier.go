@@ -1,9 +1,6 @@
 package merkle
 
-import (
-	"fmt"
-	"hash"
-)
+import "hash"
 
 type tier interface {
 	get(byte) tier
@@ -45,20 +42,25 @@ func (f *Frontier) Exclude(str []byte) {
 	f.top = f.top.set(str, zerotier{})
 }
 
-// IsExcluded tells whether str has a prefix that is a member of f.
-func (f *Frontier) IsExcluded(str []byte) bool {
-	return isExcluded(f.top, str)
+// Check tells whether str has a prefix in f.
+// It returns the prefix and true if so,
+// false if not.
+func (f *Frontier) Check(str []byte) ([]byte, bool) {
+	if f.top == nil || f.top.empty() {
+		return nil, true
+	}
+	return check(f.top, str, nil)
 }
 
-func isExcluded(tier tier, str []byte) bool {
-	fmt.Printf("* isExcluded(%s), tier %v\n", string(str), tier)
-	if tier == nil || tier.empty() {
-		return len(str) == 0
-	}
+func check(tier tier, str, prefix []byte) ([]byte, bool) {
 	if len(str) == 0 {
-		return false
+		return prefix, tier.empty()
 	}
-	return isExcluded(tier.get(str[0]), str[1:])
+	subtier := tier.get(str[0])
+	if subtier == nil {
+		return prefix, tier.empty()
+	}
+	return check(subtier, str[1:], append(prefix, str[0]))
 }
 
 // MerkleRoot produces the merkle root hash of an in-order, depth-first walk of the frontier.
