@@ -74,7 +74,7 @@ func TestText(t *testing.T) {
 		t.Errorf("merkle tree: got %s, want %s", treeRootHex, treeWantHex)
 	}
 
-	const frontierWantHex = "1636797e538ff92e187c9028d648bdf0d13acc9196953960022de3382fb53cae"
+	const frontierWantHex = "d94a741e17fbec53260720e4e1411578f826036755d34cf060e6291f0d3d3439"
 	frontierRoot := frontier.MerkleRoot(sha256.New())
 	frontierRootHex := hex.EncodeToString(frontierRoot[:])
 	if frontierRootHex != frontierWantHex {

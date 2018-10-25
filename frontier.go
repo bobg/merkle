@@ -1,8 +1,6 @@
 package merkle
 
-import (
-	"hash"
-)
+import "hash"
 
 type tier interface {
 	get(byte) tier
@@ -32,11 +30,10 @@ type Frontier struct {
 	top tier
 }
 
+// Exclude adds str to f.
+// (It's called Exclude because this means str is excluded from f's complement set.)
 func (f *Frontier) Exclude(str []byte) {
 	if len(str) == 0 {
-		if f.top != nil {
-			// xxx error
-		}
 		return
 	}
 	if f.top == nil {
@@ -45,28 +42,34 @@ func (f *Frontier) Exclude(str []byte) {
 	f.top = f.top.set(str, zerotier{})
 }
 
-// MerkleRoot produces the merkle root hash of the frontier.
-// This can be used to prove in zero knowledge that a string is not in a given set.
+// MerkleRoot produces the merkle root hash of an in-order, depth-first walk of the frontier.
+// This can be used to prove in zero knowledge that a string is not in f's complement set.
 func (f *Frontier) MerkleRoot(hasher hash.Hash) []byte {
 	m := NewTree(hasher)
-	merkleRootHelper(f.top, m, nil)
+	f.Walk(func(str []byte) {
+		m.Add(str)
+	})
 	return m.Root()
 }
 
-func merkleRootHelper(tier tier, m *Tree, prefix []byte) {
+// Walk performs an in-order depth-first traversal of f,
+// calling a callback on each string.
+// The callback must make its own copy of the string if needed;
+// Walk reuses the space on each callback call.
+func (f *Frontier) Walk(fn func(str []byte)) {
+	walkHelper(f.top, fn, nil)
+}
+
+func walkHelper(tier tier, fn func(str []byte), prefix []byte) {
 	if tier == nil {
 		return
 	}
 	for i := 0; i < 256; i++ {
-		if tier.get(byte(i)) == nil {
-			s := append([]byte{}, prefix...)
-			s = append(s, byte(i))
-			m.Add(s)
-		}
-	}
-	for i := 0; i < 256; i++ {
+		s := append(prefix, byte(i))
 		if subtier := tier.get(byte(i)); subtier != nil {
-			merkleRootHelper(subtier, m, append(prefix, byte(i)))
+			walkHelper(subtier, fn, s)
+		} else {
+			fn(s)
 		}
 	}
 }

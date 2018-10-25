@@ -15,11 +15,13 @@ type Tree struct {
 }
 
 type (
+	// ProofStep is one step in a merkle proof.
 	ProofStep struct {
 		H    []byte
 		Left bool
 	}
 
+	// Proof is a merkle proof.
 	Proof []ProofStep
 )
 
@@ -37,6 +39,8 @@ func (m *Tree) Add(str []byte) {
 		lh = make([]byte, hasher.Size())
 		LeafHash(hasher, lh[:0], str)
 	})
+
+	// This must happen outside the call to withHasher to avoid deadlock.
 	m.htree.Add(lh)
 }
 
@@ -203,6 +207,8 @@ func interiorHash(h hash.Hash, out, left, right []byte, ref *[]byte, proof *Proo
 	}
 }
 
+// Hash computes the hash of a merkle proof.
+// A valid merkle proof hash matches the root hash of the merkle tree it came from.
 func (p Proof) Hash(hasher hash.Hash, h []byte) []byte {
 	for _, step := range p {
 		if step.Left {
