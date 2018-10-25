@@ -62,9 +62,7 @@ func TestText(t *testing.T) {
 			t.Fatal(err)
 		}
 		tree.Add(buf[:n])
-		var leafhash [32]byte
-		LeafHash(hasher, leafhash[:0], buf[:n])
-		frontier.Exclude(leafhash[:])
+		frontier.Exclude(LeafHash(hasher, nil, buf[:n]))
 	}
 
 	const treeWantHex = "8acc3ef309961457bde157842e2a9d7b403294c30172b497372c19acecc622e5"
