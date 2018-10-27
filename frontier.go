@@ -63,14 +63,25 @@ func check(tier tier, str, prefix []byte) ([]byte, bool) {
 	return check(subtier, str[1:], append(prefix, str[0]))
 }
 
-// MerkleRoot produces the merkle root hash of an in-order, depth-first walk of the frontier.
-// This can be used to prove in zero knowledge that a string is not in f's complement set.
-func (f *Frontier) MerkleRoot(hasher hash.Hash) []byte {
+// MerkleTree produces the merkle hash tree of an in-order, depth-first walk of the frontier.
+// This can be used to prove in zero knowledge that a string is not in f's complement set
+// (by proving that a prefix of that string is in f).
+func (f *Frontier) MerkleTree(hasher hash.Hash) *Tree {
 	m := NewTree(hasher)
 	f.Walk(func(str []byte) {
 		m.Add(str)
 	})
-	return m.Root()
+	return m
+}
+
+// MerkleProofTree produces the a merkle hash tree of an in-order, depth-first walk of the frontier
+// that is able to prove compactly that it contains the given reference string.
+func (f *Frontier) MerkleProofTree(hasher hash.Hash, ref []byte) *Tree {
+	m := NewProofTree(hasher, ref)
+	f.Walk(func(str []byte) {
+		m.Add(str)
+	})
+	return m
 }
 
 // Walk performs an in-order depth-first traversal of f,

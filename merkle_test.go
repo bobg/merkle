@@ -73,7 +73,8 @@ func TestText(t *testing.T) {
 	}
 
 	const frontierWantHex = "d94a741e17fbec53260720e4e1411578f826036755d34cf060e6291f0d3d3439"
-	frontierRoot := frontier.MerkleRoot(sha256.New())
+	frontierTree := frontier.MerkleTree(sha256.New())
+	frontierRoot := frontierTree.Root()
 	frontierRootHex := hex.EncodeToString(frontierRoot)
 	if frontierRootHex != frontierWantHex {
 		t.Errorf("frontier: got %s, want %s", frontierRootHex, frontierWantHex)
@@ -213,7 +214,8 @@ func BenchmarkTextFrontierMerkleRoot(b *testing.B) {
 				}
 				frontier.Exclude(buf[:n])
 			}
-			frontier.MerkleRoot(sha256.New())
+			frontierTree := frontier.MerkleTree(sha256.New())
+			frontierTree.Root()
 		}()
 	}
 }
