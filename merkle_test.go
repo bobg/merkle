@@ -48,8 +48,6 @@ func TestText(t *testing.T) {
 	const chunksize = 256
 
 	tree := NewTree(sha256.New())
-	hasher := sha256.New()
-	var frontier Frontier
 
 	for {
 		var buf [chunksize]byte
@@ -62,7 +60,6 @@ func TestText(t *testing.T) {
 			t.Fatal(err)
 		}
 		tree.Add(buf[:n])
-		frontier.Exclude(LeafHash(hasher, nil, buf[:n]))
 	}
 
 	const treeWantHex = "8acc3ef309961457bde157842e2a9d7b403294c30172b497372c19acecc622e5"
@@ -70,14 +67,6 @@ func TestText(t *testing.T) {
 	treeRootHex := hex.EncodeToString(treeRoot)
 	if treeRootHex != treeWantHex {
 		t.Errorf("merkle tree: got %s, want %s", treeRootHex, treeWantHex)
-	}
-
-	const frontierWantHex = "d94a741e17fbec53260720e4e1411578f826036755d34cf060e6291f0d3d3439"
-	frontierTree := frontier.MerkleTree(sha256.New())
-	frontierRoot := frontierTree.Root()
-	frontierRootHex := hex.EncodeToString(frontierRoot)
-	if frontierRootHex != frontierWantHex {
-		t.Errorf("frontier: got %s, want %s", frontierRootHex, frontierWantHex)
 	}
 }
 
@@ -160,62 +149,6 @@ func BenchmarkTextMerkleTree(b *testing.B) {
 				tree.Add(buf[:n])
 			}
 			tree.Root()
-		}()
-	}
-}
-
-func BenchmarkTextFrontier(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		func() {
-			f, err := os.Open("testdata/udhr.txt")
-			if err != nil {
-				b.Fatal(err)
-			}
-			defer f.Close()
-
-			const chunksize = 256
-			var frontier Frontier
-			for {
-				var buf [chunksize]byte
-				n, err := io.ReadFull(f, buf[:])
-				if err == io.EOF {
-					// "The error is EOF only if no bytes were read."
-					break
-				}
-				if err != nil && err != io.ErrUnexpectedEOF {
-					b.Fatal(err)
-				}
-				frontier.Exclude(buf[:n])
-			}
-		}()
-	}
-}
-
-func BenchmarkTextFrontierMerkleRoot(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		func() {
-			f, err := os.Open("testdata/udhr.txt")
-			if err != nil {
-				b.Fatal(err)
-			}
-			defer f.Close()
-
-			const chunksize = 256
-			var frontier Frontier
-			for {
-				var buf [chunksize]byte
-				n, err := io.ReadFull(f, buf[:])
-				if err == io.EOF {
-					// "The error is EOF only if no bytes were read."
-					break
-				}
-				if err != nil && err != io.ErrUnexpectedEOF {
-					b.Fatal(err)
-				}
-				frontier.Exclude(buf[:n])
-			}
-			frontierTree := frontier.MerkleTree(sha256.New())
-			frontierTree.Root()
 		}()
 	}
 }
