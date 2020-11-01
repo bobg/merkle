@@ -22,7 +22,13 @@ type (
 	}
 
 	// Proof is a merkle proof.
-	Proof []ProofStep
+	Proof struct {
+		Steps []ProofStep
+
+		// This is true for Tree Proofs and false for HTree Proofs.
+		// It indicates that the argument to Proof.Hash has to be leaf-hashed first.
+		needsLeafHashing bool
+	}
 )
 
 // NewTree produces a new Tree.
@@ -60,7 +66,9 @@ func (m *Tree) Root() []byte {
 // Proof returns the merkle proof for the reference string given to NewProofTree.
 // It is an error to call Add after a call to Proof.
 func (m *Tree) Proof() Proof {
-	return m.htree.Proof()
+	proof := m.htree.Proof()
+	proof.needsLeafHashing = true
+	return proof
 }
 
 // HTree accepts a sequence of leaf hashes via its Add method.
@@ -233,7 +241,7 @@ func interiorHash(h hash.Hash, out, left, right []byte, ref *[]byte, proof *Proo
 			step = &ProofStep{H: dup, Left: true}
 		}
 		if step != nil {
-			*proof = append(*proof, *step)
+			proof.Steps = append(proof.Steps, *step)
 		}
 	}
 
@@ -256,16 +264,21 @@ func interiorHash(h hash.Hash, out, left, right []byte, ref *[]byte, proof *Proo
 // Hash computes the hash of a merkle proof.
 // A valid merkle proof hash matches the root hash of the merkle tree it came from.
 //
-// To validate a proof made with NewProofTree(..., x)
-// (for some byte sequence x)
-// it is necessary to call proof.Hash(..., LeafHash(..., ..., x))
-//
-// To validate a proof made with NewProofHTree(..., x)
-// it is only necessary to call proof.Hash(..., x).
+// To prove that x is in a tree, create a tree t with NewProofTree(h, x).
+// Then fill the tree with calls to t.Add.
+// Then get the proof p with t.Proof().
+// Then check that p.Hash(h, x) is the same as t.Root().
+// This will be true only if there was a call t.Add(x).
 func (p Proof) Hash(hasher hash.Hash, ref []byte) []byte {
 	result := make([]byte, hasher.Size())
-	copy(result, ref)
-	for _, step := range p {
+
+	if p.needsLeafHashing {
+		LeafHash(hasher, result[:0], ref)
+	} else {
+		copy(result, ref)
+	}
+
+	for _, step := range p.Steps {
 		if step.Left {
 			interiorHash(hasher, result[:0], step.H, result, nil, nil)
 		} else {

@@ -1,4 +1,4 @@
-module github.com/bobg/merkle
+module github.com/bobg/merkle/v2
 
 go 1.14
 

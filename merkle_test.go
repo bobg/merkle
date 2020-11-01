@@ -10,6 +10,8 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
+// TestMerkleRoot uses SHA3-256 for historical reasons
+// (to wit, verifying that the implementation agrees with the one in github.com/chain/txvm).
 func TestMerkleRoot(t *testing.T) {
 	cases := []struct {
 		input   [][]byte
@@ -70,7 +72,7 @@ func TestText(t *testing.T) {
 	}
 }
 
-func TestProof(t *testing.T) {
+func TestTreeProof(t *testing.T) {
 	f, err := os.Open("testdata/udhr.txt")
 	if err != nil {
 		t.Fatal(err)
@@ -105,7 +107,7 @@ func TestProof(t *testing.T) {
 			t.Errorf("got tree root %s, want %s", rootHex, wantHex)
 		}
 		proof := tree.Proof()
-		proofHash := proof.Hash(hasher, LeafHash(hasher, nil, refchunk))
+		proofHash := proof.Hash(hasher, refchunk)
 		proofHashHex := hex.EncodeToString(proofHash)
 		if proofHashHex != wantHex {
 			t.Errorf("got proof hash %s, want %s", proofHashHex, wantHex)
@@ -115,6 +117,61 @@ func TestProof(t *testing.T) {
 		tree = NewProofTree(hasher, wrongchunk)
 		for _, chunk := range chunks {
 			tree.Add(chunk)
+		}
+		proof = tree.Proof()
+		proofHash = proof.Hash(hasher, wrongchunk)
+		proofHashHex = hex.EncodeToString(proofHash)
+		if proofHashHex == wantHex {
+			t.Error("unexpected proof hash match!")
+		}
+	}
+}
+
+func TestHTreeProof(t *testing.T) {
+	f, err := os.Open("testdata/udhr.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+
+	const chunksize = 256
+	var chunks [][]byte
+	for {
+		var buf [chunksize]byte
+		n, err := io.ReadFull(f, buf[:])
+		if err == io.EOF {
+			// "The error is EOF only if no bytes were read."
+			break
+		}
+		if err != nil && err != io.ErrUnexpectedEOF {
+			t.Fatal(err)
+		}
+		chunks = append(chunks, buf[:n])
+	}
+
+	const wantHex = "8acc3ef309961457bde157842e2a9d7b403294c30172b497372c19acecc622e5"
+	hasher := sha256.New()
+	for _, refchunk := range chunks {
+		tree := NewProofHTree(hasher, LeafHash(hasher, nil, refchunk))
+		for _, chunk := range chunks {
+			tree.Add(LeafHash(hasher, nil, chunk))
+		}
+		root := tree.Root()
+		rootHex := hex.EncodeToString(root)
+		if rootHex != wantHex {
+			t.Errorf("got tree root %s, want %s", rootHex, wantHex)
+		}
+		proof := tree.Proof()
+		proofHash := proof.Hash(hasher, LeafHash(hasher, nil, refchunk))
+		proofHashHex := hex.EncodeToString(proofHash)
+		if proofHashHex != wantHex {
+			t.Errorf("got proof hash %s, want %s", proofHashHex, wantHex)
+		}
+
+		wrongchunk := refchunk[1:]
+		tree = NewProofHTree(hasher, LeafHash(hasher, nil, wrongchunk))
+		for _, chunk := range chunks {
+			tree.Add(LeafHash(hasher, nil, chunk))
 		}
 		proof = tree.Proof()
 		proofHash = proof.Hash(hasher, LeafHash(hasher, nil, wrongchunk))
