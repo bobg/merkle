@@ -255,6 +255,13 @@ func interiorHash(h hash.Hash, out, left, right []byte, ref *[]byte, proof *Proo
 
 // Hash computes the hash of a merkle proof.
 // A valid merkle proof hash matches the root hash of the merkle tree it came from.
+//
+// To validate a proof made with NewProofTree(..., x)
+// (for some byte sequence x)
+// it is necessary to call proof.Hash(..., LeafHash(..., ..., x))
+//
+// To validate a proof made with NewProofHTree(..., x)
+// it is only necessary to call proof.Hash(..., x).
 func (p Proof) Hash(hasher hash.Hash, ref []byte) []byte {
 	result := make([]byte, hasher.Size())
 	copy(result, ref)
