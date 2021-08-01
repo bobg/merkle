@@ -13,7 +13,7 @@ func Example_computeMerkleRoot() {
 	for str := range ch {
 		tree.Add(str)
 	}
-	// The merkle root hash of the sequence of strings is now tree.Root()
+	// The Merkle root hash of the sequence of strings is now tree.Root()
 }
 
 func Example_produceMerkleProof() {
@@ -27,7 +27,7 @@ func Example_produceMerkleProof() {
 		tree.Add(str)
 	}
 	proof := tree.Proof()
-	// A verifier with only the merkle root hash r,
+	// A verifier with only the Merkle root hash r,
 	// and this proof,
 	// can verify ref belongs in the tree by checking:
 	//   bytes.Equal(r, proof.Hash(sha256.New(), ref))

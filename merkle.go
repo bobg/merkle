@@ -6,21 +6,21 @@ import (
 )
 
 // Tree accepts a sequence of strings via its Add method.
-// It builds a merkle hash tree from them.
+// It builds a Merkle hash tree from them.
 // After adding all strings in the sequence,
-// their merkle root hash may be read via the Root method.
+// their Merkle root hash may be read via the Root method.
 type Tree struct {
 	htree *HTree
 }
 
 type (
-	// ProofStep is one step in a merkle proof.
+	// ProofStep is one step in a Merkle proof.
 	ProofStep struct {
 		H    []byte
 		Left bool
 	}
 
-	// Proof is a merkle proof.
+	// Proof is a Merkle proof.
 	Proof struct {
 		Steps []ProofStep
 
@@ -51,14 +51,14 @@ func (m *Tree) Add(str []byte) {
 	m.htree.Add(lh)
 }
 
-// Root returns the merkle root hash
+// Root returns the Merkle root hash
 // for the sequence of strings that have been added to m with Add.
 // It is an error to call Add after a call to Root.
 func (m *Tree) Root() []byte {
 	return m.htree.Root()
 }
 
-// Proof returns the merkle proof for the reference string given to NewProofTree.
+// Proof returns the Merkle inclusion proof for the reference string given to NewProofTree.
 // It is an error to call Add after a call to Proof.
 func (m *Tree) Proof() Proof {
 	proof := m.htree.Proof()
@@ -69,7 +69,7 @@ func (m *Tree) Proof() Proof {
 // HTree accepts a sequence of leaf hashes via its Add method.
 // A leaf hash is the result of calling LeafHash on a string.
 // After adding all leaf hashes in the sequence,
-// their merkle root hash may be read via the Root method.
+// their Merkle root hash may be read via the Root method.
 //
 // Note that a Tree works by converting its input from a sequence of strings
 // to the corresponding sequence of leaf hashes and feeding those to an HTree.
@@ -154,7 +154,7 @@ func (h *HTree) finish() {
 	}
 }
 
-// Root returns the merkle root hash
+// Root returns the Merkle root hash
 // for the sequence of leaf hashes that have been added to h with Add.
 // It is an error to call Add after a call to Root.
 func (h *HTree) Root() []byte {
@@ -162,7 +162,7 @@ func (h *HTree) Root() []byte {
 	return *h.root
 }
 
-// Proof returns the merkle proof for the reference hash given to NewProofHTree.
+// Proof returns the Merkle inclusion proof for the reference hash given to NewProofHTree.
 // It is an error to call Add after a call to Proof.
 func (h *HTree) Proof() Proof {
 	h.finish()
@@ -221,14 +221,14 @@ func interiorHash(h hash.Hash, out, left, right []byte, ref *[]byte, proof *Proo
 	}
 }
 
-// Hash computes the hash of a merkle proof.
-// A valid merkle proof hash matches the root hash of the merkle tree it came from.
+// Hash computes the hash of a Merkle proof.
+// A valid Merkle proof hash matches the root hash of the Merkle tree it came from.
 //
 // To prove that x is in a tree, create a tree t with NewProofTree(h, x).
 // Then fill the tree with calls to t.Add.
 // Then get the proof p with t.Proof().
 // Then check that p.Hash(h, x) is the same as t.Root().
-// This will be true only if there was a call t.Add(x).
+// This will be true only if there was a call t.Add(x) in the proper sequence.
 func (p Proof) Hash(hasher hash.Hash, ref []byte) []byte {
 	result := make([]byte, hasher.Size())
 

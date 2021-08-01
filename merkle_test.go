@@ -69,7 +69,7 @@ func TestText(t *testing.T) {
 	treeRoot := tree.Root()
 	treeRootHex := hex.EncodeToString(treeRoot)
 	if treeRootHex != treeWantHex {
-		t.Errorf("merkle tree: got %s, want %s", treeRootHex, treeWantHex)
+		t.Errorf("Merkle tree: got %s, want %s", treeRootHex, treeWantHex)
 	}
 }
 

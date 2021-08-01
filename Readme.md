@@ -5,13 +5,16 @@
 ![Tests](https://github.com/bobg/merkle/actions/workflows/go.yml/badge.svg)
 
 This is merkle,
-a Go package for computing the merkle root hash of a sequence of byte strings,
+a Go package for computing the Merkle root hash of a sequence of byte strings,
 or of their hashes.
-It can also produce a compact proof that a given string belongs in a merkle tree with a given root hash.
+It can also produce a compact proof that a given string belongs in a Merkle tree with a given root hash.
 
 This implementation does not require holding all of the input in memory while computing a root hash or a proof.
 Instead, it is able to operate on a stream of input strings of unbounded length,
 holding incremental state that is only logarithmic [O(log N)] in the size of the input.
+
+For more about Merkle trees,
+see [the Wikipedia article](https://en.wikipedia.org/wiki/Merkle_tree).
 
 Creating a merkle root hash:
 
