@@ -3,6 +3,7 @@ package merkle
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"io"
 	"os"
 	"testing"
@@ -183,29 +184,31 @@ func TestHTreeProof(t *testing.T) {
 }
 
 func BenchmarkTextMerkleTree(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		func() {
-			f, err := os.Open("testdata/udhr.txt")
-			if err != nil {
-				b.Fatal(err)
-			}
-			defer f.Close()
+	var chunks [][]byte
+	f, err := os.Open("testdata/udhr.txt")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer f.Close()
 
-			const chunksize = 256
-			tree := NewTree(sha256.New())
-			for {
-				var buf [chunksize]byte
-				n, err := io.ReadFull(f, buf[:])
-				if err == io.EOF {
-					// "The error is EOF only if no bytes were read."
-					break
-				}
-				if err != nil && err != io.ErrUnexpectedEOF {
-					b.Fatal(err)
-				}
-				tree.Add(buf[:n])
-			}
-			tree.Root()
-		}()
+	var buf [256]byte
+	for {
+		n, err := io.ReadFull(f, buf[:])
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		chunk := make([]byte, n)
+		copy(chunk, buf[:n])
+		chunks = append(chunks, chunk)
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		tree := NewTree(sha256.New())
+		for _, chunk := range chunks {
+			tree.Add(chunk)
+		}
+		tree.Root()
 	}
 }
