@@ -6,7 +6,7 @@ import (
 	"github.com/bobg/merkle/v2"
 )
 
-func ExampleComputeMerkleRoot() {
+func Example_computeMerkleRoot() {
 	var ch <-chan []byte // Represents a sequence of byte strings
 
 	tree := merkle.NewTree(sha256.New())
@@ -16,7 +16,7 @@ func ExampleComputeMerkleRoot() {
 	// The merkle root hash of the sequence of strings is now tree.Root()
 }
 
-func ExampleProduceMerkleProof() {
+func Example_produceMerkleProof() {
 	var (
 		ch  <-chan []byte // Represents a sequence of byte strings
 		ref []byte        // Represents the string you will later want to prove is a member of the tree we're about to build
@@ -30,6 +30,6 @@ func ExampleProduceMerkleProof() {
 	// A verifier with only the merkle root hash r,
 	// and this proof,
 	// can verify ref belongs in the tree by checking:
-	//   bytes.Equal(proof.Hash(sha256.New(), ref), r)
+	//   bytes.Equal(r, proof.Hash(sha256.New(), ref))
 	_ = proof
 }

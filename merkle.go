@@ -3,7 +3,6 @@ package merkle
 import (
 	"bytes"
 	"hash"
-	"sync"
 )
 
 // Tree accepts a sequence of strings via its Add method.
@@ -46,13 +45,9 @@ func NewProofTree(hasher hash.Hash, ref []byte) *Tree {
 // The caller may reuse the space in str.
 // It is an error to call Add after a call to Root or Proof.
 func (m *Tree) Add(str []byte) {
-	var lh []byte
-	m.htree.withHasher(func(hasher hash.Hash) {
-		lh = make([]byte, hasher.Size())
-		LeafHash(hasher, lh[:0], str)
-	})
-
-	// This must happen outside the call to withHasher to avoid deadlock.
+	hasher := m.htree.hasher
+	lh := make([]byte, hasher.Size())
+	LeafHash(hasher, lh[:0], str)
 	m.htree.Add(lh)
 }
 
@@ -79,12 +74,10 @@ func (m *Tree) Proof() Proof {
 // Note that a Tree works by converting its input from a sequence of strings
 // to the corresponding sequence of leaf hashes and feeding those to an HTree.
 type HTree struct {
-	ch    chan<- []byte
-	ready <-chan struct{}
-	root  *[]byte
-	proof *Proof
-
-	mu     sync.Mutex // protects hasher
+	hashes [][]byte
+	root   *[]byte
+	ref    *[]byte
+	proof  *Proof
 	hasher hash.Hash
 }
 
@@ -100,76 +93,11 @@ func NewProofHTree(hasher hash.Hash, ref []byte) *HTree {
 }
 
 func newHTree(hasher hash.Hash, ref []byte) *HTree {
-	var (
-		ch    = make(chan []byte)
-		ready = make(chan struct{})
-		root  []byte
-		proof Proof
-		htree = &HTree{
-			ch:     ch,
-			ready:  ready,
-			root:   &root,
-			proof:  &proof,
-			hasher: hasher,
-		}
-	)
-
-	go func() {
-		defer close(ready)
-
-		var hashes [][]byte
-
-		for h := range ch {
-
-			// Find the lowest height in hashes where this hash fits.
-			// For each level where it does not fit,
-			// compute a combined hash, empty that level,
-			// and continue searching one level higher with the new hash.
-			for height := 0; ; height++ {
-				if height == len(hashes) {
-					// All levels filled. Add a new level.
-					hashes = append(hashes, h)
-					break
-				}
-				if hashes[height] == nil {
-					// This level is vacant. Fill it.
-					hashes[height] = h
-					break
-				}
-
-				// This level is full. Compute a combined hash and keep searching.
-				htree.withHasher(func(hasher hash.Hash) {
-					interiorHash(hasher, h[:0], hashes[height], h, &ref, &proof)
-				})
-
-				// Also vacate this level.
-				hashes[height] = nil
-			}
-		}
-
-		if len(hashes) == 0 {
-			htree.withHasher(func(hasher hash.Hash) {
-				hasher.Reset()
-				root = hasher.Sum(nil)
-			})
-			return
-		}
-
-		// Combine hashes upward toward the highest level in hashes.
-		for _, h := range hashes {
-			if h == nil {
-				continue
-			}
-			if root == nil {
-				root = h
-				continue
-			}
-			htree.withHasher(func(hasher hash.Hash) {
-				interiorHash(hasher, root[:0], h, root, &ref, &proof)
-			})
-		}
-	}()
-
+	htree := &HTree{hasher: hasher}
+	if ref != nil {
+		htree.ref = &ref
+		htree.proof = new(Proof)
+	}
 	return htree
 }
 
@@ -177,35 +105,67 @@ func newHTree(hasher hash.Hash, ref []byte) *HTree {
 // The caller must not reuse the space in item.
 // It is an error to call Add after a call to Root or Proof.
 func (h *HTree) Add(item []byte) {
-	h.ch <- item
+	// Find the lowest height in hashes where this hash fits.
+	// For each level where it does not fit,
+	// compute a combined hash, empty that level,
+	// and continue searching one level higher with the new hash.
+	for height := 0; ; height++ {
+		if height == len(h.hashes) {
+			// All levels filled. Add a new level.
+			h.hashes = append(h.hashes, item)
+			break
+		}
+		if h.hashes[height] == nil {
+			// This level is vacant. Fill it.
+			h.hashes[height] = item
+			break
+		}
+
+		// This level is full. Compute a combined hash and keep searching.
+		interiorHash(h.hasher, item[:0], h.hashes[height], item, h.ref, h.proof)
+
+		// Also vacate this level.
+		h.hashes[height] = nil
+	}
 }
 
-func (h *HTree) withHasher(f func(hasher hash.Hash)) {
-	h.mu.Lock()
-	f(h.hasher)
-	h.mu.Unlock()
+func (h *HTree) finish() {
+	if h.root != nil {
+		return
+	}
+	if len(h.hashes) == 0 {
+		h.hasher.Reset()
+		root := h.hasher.Sum(nil)
+		h.root = &root
+		return
+	}
+
+	// Combine hashes upward toward the highest level in hashes.
+	for _, hh := range h.hashes {
+		if hh == nil {
+			continue
+		}
+		hh := hh
+		if h.root == nil {
+			h.root = &hh
+			continue
+		}
+		interiorHash(h.hasher, (*h.root)[:0], hh, *h.root, h.ref, h.proof)
+	}
 }
 
 // Root returns the merkle root hash
 // for the sequence of leaf hashes that have been added to h with Add.
 // It is an error to call Add after a call to Root.
 func (h *HTree) Root() []byte {
-	if h.ch != nil {
-		close(h.ch)
-		h.ch = nil
-	}
-	<-h.ready
+	h.finish()
 	return *h.root
 }
 
 // Proof returns the merkle proof for the reference hash given to NewProofHTree.
 // It is an error to call Add after a call to Proof.
 func (h *HTree) Proof() Proof {
-	if h.ch != nil {
-		close(h.ch)
-		h.ch = nil
-	}
-	<-h.ready
+	h.finish()
 	return *h.proof
 }
 
