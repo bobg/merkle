@@ -3,6 +3,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/bobg/merkle.svg)](https://pkg.go.dev/github.com/bobg/merkle)
 [![Go Report Card](https://goreportcard.com/badge/github.com/bobg/merkle)](https://goreportcard.com/report/github.com/bobg/merkle)
 ![Tests](https://github.com/bobg/merkle/actions/workflows/go.yml/badge.svg)
+[![Coverage Status](https://coveralls.io/repos/github/bobg/merkle/badge.svg?branch=master)](https://coveralls.io/github/bobg/merkle?branch=master)
 
 This is merkle,
 a Go package for computing the Merkle root hash of a sequence of byte strings,
