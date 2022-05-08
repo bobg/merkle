@@ -2,8 +2,9 @@
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/bobg/merkle.svg)](https://pkg.go.dev/github.com/bobg/merkle)
 [![Go Report Card](https://goreportcard.com/badge/github.com/bobg/merkle)](https://goreportcard.com/report/github.com/bobg/merkle)
-![Tests](https://github.com/bobg/merkle/actions/workflows/go.yml/badge.svg)
+[![Tests](https://github.com/bobg/merkle/actions/workflows/go.yml/badge.svg)](https://github.com/bobg/merkle/actions/workflows/go.yml)
 [![Coverage Status](https://coveralls.io/repos/github/bobg/merkle/badge.svg?branch=master)](https://coveralls.io/github/bobg/merkle?branch=master)
+[![Mentioned in Awesome Go](https://awesome.re/mentioned-badge.svg)](https://github.com/avelino/awesome-go)
 
 This is merkle,
 a Go package for computing the Merkle root hash of a sequence of byte strings,
