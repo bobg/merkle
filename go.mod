@@ -1,5 +1,5 @@
 module github.com/bobg/merkle/v2
 
-go 1.14
+go 1.20
 
 require golang.org/x/crypto v0.25.0
